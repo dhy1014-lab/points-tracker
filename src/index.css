@@ -1,0 +1,44 @@
+/* src/index.css */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f9f8f6;
+  --surface: #ffffff;
+  --border: #e8e6e0;
+  --border-strong: #d0cdc6;
+  --text: #1a1917;
+  --text-2: #6b6860;
+  --text-3: #9e9b94;
+  --accent: #2563eb;
+  --accent-light: #eff4ff;
+  --accent-text: #1d4ed8;
+  --green: #16a34a;
+  --green-light: #f0fdf4;
+  --green-text: #15803d;
+  --amber: #d97706;
+  --amber-light: #fffbeb;
+  --amber-text: #b45309;
+  --red: #dc2626;
+  --red-light: #fef2f2;
+  --red-text: #b91c1c;
+  --mono: 'DM Mono', monospace;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
