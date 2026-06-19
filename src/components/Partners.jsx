@@ -1,6 +1,7 @@
 // src/components/Partners.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { add, update, remove } from '../lib/db'
+import { seedTransferPartners } from '../lib/seedPartners'
 import Modal from './Modal'
 import { Field, Input, Select, Row, ModalActions, Badge, IconBtn } from './FormField'
 
@@ -50,6 +51,12 @@ export default function Partners({ uid, partners, readonly, showSections, myName
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(blank())
   const [editId, setEditId] = useState(null)
+
+  useEffect(() => {
+    if (!readonly && uid && partners.length === 0) {
+      seedTransferPartners(uid)
+    }
+  }, [uid, readonly]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const openAdd = () => { setForm(blank()); setEditId(null); setOpen(true) }
