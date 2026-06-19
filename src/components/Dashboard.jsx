@@ -1,12 +1,15 @@
 // src/components/Dashboard.jsx
 import { Badge } from './FormField'
 
-export default function Dashboard({ cards, ecosystems, opportunities }) {
+export default function Dashboard({ cards, ecosystems, opportunities, credits = [] }) {
   const daysUntil = (d) => d ? Math.round((new Date(d) - new Date()) / 86400000) : null
 
   const totalPoints = ecosystems.reduce((a, e) => a + (parseInt(e.balance) || 0), 0)
   const totalValue = ecosystems.reduce((a, e) => a + ((parseInt(e.balance) || 0) * (parseFloat(e.cpp) || 0) / 100), 0)
   const totalFees = cards.filter(c => c.status === 'Active').reduce((a, c) => a + (parseFloat(c.fee) || 0), 0)
+  const creditsTotal = credits.reduce((a, c) => a + (parseFloat(c.amount) || 0), 0)
+  const creditsUsed = credits.filter(c => c.used).reduce((a, c) => a + (parseFloat(c.amount) || 0), 0)
+  const creditsUnused = creditsTotal - creditsUsed
   const activeCards = cards.filter(c => c.status === 'Active').length
 
   const upcomingRenewals = cards
@@ -44,6 +47,7 @@ export default function Dashboard({ cards, ecosystems, opportunities }) {
         {metric('Est. value', '$' + Math.round(totalValue).toLocaleString(), 'across all programs')}
         {metric('Active cards', activeCards)}
         {metric('Annual fees', '$' + Math.round(totalFees).toLocaleString() + '/yr')}
+        {metric('Unused credits', '$' + Math.round(creditsUnused).toLocaleString(), `of $${Math.round(creditsTotal).toLocaleString()} tracked`)}
       </div>
 
       {alerts.length > 0 && (

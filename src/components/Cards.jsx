@@ -1,53 +1,67 @@
 // src/components/Cards.jsx
 import { useState } from 'react'
-import { add, update, remove } from '../lib/db'
+import { add, update, remove, reorder } from '../lib/db'
 import Modal from './Modal'
 import { Field, Input, Select, Row, ModalActions, Badge, IconBtn } from './FormField'
+import { SortableContainer, SortableItem, DragHandle } from './SortableList'
 
 const STATUS_COLOR = { Active: 'green', Canceling: 'amber', Closed: 'red', Pending: 'blue' }
-const blank = () => ({ name: '', ecosystem: '', fee: '', renewal: '', status: 'Active', notes: '' })
+const blank = () => ({ name: '', ecosystem: '', fee: '', renewal: '', status: 'Active', notes: '', group: 'Personal' })
 
-function CardGrid({ cards, uid, readonly, onEdit }) {
+function CardItem({ c, uid, readonly, onEdit, listeners, dragDisabled }) {
   const daysUntil = (d) => d ? Math.round((new Date(d) - new Date()) / 86400000) : null
-
-  if (cards.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '1rem 0' }}>No cards</div>
+  const days = daysUntil(c.renewal)
+  const renewalColor = days === null ? null : days < 0 ? 'red' : days <= 30 ? 'amber' : 'gray'
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginBottom: 8 }}>
-      {cards.map(c => {
-        const days = daysUntil(c.renewal)
-        const renewalColor = days === null ? null : days < 0 ? 'red' : days <= 30 ? 'amber' : 'gray'
-        return (
-          <div key={c.id} style={{
-            background: 'var(--surface)', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <div>
-                <div style={{ fontWeight: 500, fontSize: 14 }}>{c.name}</div>
-                {c.ecosystem && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{c.ecosystem}</div>}
-              </div>
-              <Badge color={STATUS_COLOR[c.status] || 'blue'}>{c.status}</Badge>
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-              {c.fee && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>${c.fee}/yr</span>}
-              {c.renewal && renewalColor && (
-                <Badge color={renewalColor}>
-                  {days < 0 ? 'Expired' : days === 0 ? 'Due today' : `${days}d to renewal`}
-                </Badge>
-              )}
-            </div>
-            {c.notes && <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8 }}>{c.notes}</div>}
-            {!readonly && c._uid === uid && (
-              <div style={{ display: 'flex', gap: 4 }}>
-                <IconBtn onClick={() => onEdit(c)} title="Edit">✏️</IconBtn>
-                <IconBtn onClick={() => remove(uid, 'cards', c.id)} title="Delete">🗑</IconBtn>
-              </div>
-            )}
+    <div style={{
+      background: 'var(--surface)', border: '1px solid var(--border)',
+      borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem', position: 'relative'
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+          {!readonly && !dragDisabled && <DragHandle listeners={listeners} />}
+          <div>
+            <div style={{ fontWeight: 500, fontSize: 14 }}>{c.name}</div>
+            {c.ecosystem && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{c.ecosystem}</div>}
           </div>
-        )
-      })}
+        </div>
+        <Badge color={STATUS_COLOR[c.status] || 'blue'}>{c.status}</Badge>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        {c.fee && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>${c.fee}/yr</span>}
+        {c.renewal && renewalColor && (
+          <Badge color={renewalColor}>
+            {days < 0 ? 'Expired' : days === 0 ? 'Due today' : `${days}d to renewal`}
+          </Badge>
+        )}
+      </div>
+      {c.notes && <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8 }}>{c.notes}</div>}
+      {!readonly && c._uid === uid && (
+        <div style={{ display: 'flex', gap: 4 }}>
+          <IconBtn onClick={() => onEdit(c)} title="Edit">✏️</IconBtn>
+          <IconBtn onClick={() => remove(uid, 'cards', c.id)} title="Delete">🗑</IconBtn>
+        </div>
+      )}
     </div>
+  )
+}
+
+function CardGrid({ cards, uid, readonly, onEdit, onReorder }) {
+  if (cards.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '1rem 0' }}>No cards</div>
+
+  const dragDisabled = readonly || cards.some(c => c._uid !== uid)
+
+  return (
+    <SortableContainer items={cards} onReorder={onReorder} disabled={dragDisabled}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginBottom: 8 }}>
+        {cards.map(c => (
+          <SortableItem key={c.id} id={c.id} disabled={dragDisabled}>
+            {(listeners) => <CardItem c={c} uid={uid} readonly={readonly} onEdit={onEdit} listeners={listeners} dragDisabled={dragDisabled} />}
+          </SortableItem>
+        ))}
+      </div>
+    </SortableContainer>
   )
 }
 
@@ -58,7 +72,7 @@ export default function Cards({ uid, cards, readonly, showSections, myName, part
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const openAdd = () => { setForm(blank()); setEditId(null); setOpen(true) }
-  const openEdit = (c) => { setForm({ name: c.name, ecosystem: c.ecosystem, fee: c.fee, renewal: c.renewal, status: c.status, notes: c.notes }); setEditId(c.id); setOpen(true) }
+  const openEdit = (c) => { setForm({ name: c.name, ecosystem: c.ecosystem, fee: c.fee, renewal: c.renewal, status: c.status, notes: c.notes, group: c.group || 'Personal' }); setEditId(c.id); setOpen(true) }
 
   const save = async () => {
     if (!form.name.trim()) return
@@ -67,14 +81,39 @@ export default function Cards({ uid, cards, readonly, showSections, myName, part
     setOpen(false)
   }
 
+  const handleReorder = async (newOrder) => {
+    await reorder(uid, 'cards', newOrder.map((item, i) => ({ id: item.id, sortOrder: i })))
+  }
+
   const myCards = cards.filter(c => c._holder === myName)
   const partnerCards = cards.filter(c => c._holder === partnerName)
+
+  // Group by Business/Personal within each holder
+  const groupBy = (list) => {
+    const groups = {}
+    list.forEach(c => {
+      const g = c.group || 'Personal'
+      if (!groups[g]) groups[g] = []
+      groups[g].push(c)
+    })
+    return groups
+  }
 
   const SectionHeader = ({ name, count }) => (
     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10, marginTop: 16 }}>
       {name} · {count} card{count !== 1 ? 's' : ''}
     </div>
   )
+
+  const GroupBlock = ({ list, holderReadonly }) => {
+    const groups = groupBy(list)
+    return Object.entries(groups).map(([groupName, items]) => (
+      <div key={groupName} style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-3)', marginBottom: 8 }}>{groupName}</div>
+        <CardGrid cards={items} uid={uid} readonly={holderReadonly} onEdit={openEdit} onReorder={handleReorder} />
+      </div>
+    ))
+  }
 
   return (
     <div>
@@ -95,11 +134,11 @@ export default function Cards({ uid, cards, readonly, showSections, myName, part
 
       {showSections ? (
         <>
-          {myCards.length > 0 && <><SectionHeader name={myName} count={myCards.length} /><CardGrid cards={myCards} uid={uid} readonly={readonly} onEdit={openEdit} /></>}
-          {partnerCards.length > 0 && <><SectionHeader name={partnerName} count={partnerCards.length} /><CardGrid cards={partnerCards} uid={uid} readonly={true} onEdit={openEdit} /></>}
+          {myCards.length > 0 && <><SectionHeader name={myName} count={myCards.length} /><GroupBlock list={myCards} holderReadonly={readonly} /></>}
+          {partnerCards.length > 0 && <><SectionHeader name={partnerName} count={partnerCards.length} /><GroupBlock list={partnerCards} holderReadonly={true} /></>}
         </>
       ) : (
-        <CardGrid cards={cards} uid={uid} readonly={readonly} onEdit={openEdit} />
+        <GroupBlock list={cards} holderReadonly={readonly} />
       )}
 
       <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Edit card' : 'Add card'}>
@@ -116,6 +155,11 @@ export default function Cards({ uid, cards, readonly, showSections, myName, part
             </Select>
           </Field>
         </Row>
+        <Field label="Group">
+          <Select value={form.group} onChange={e => set('group', e.target.value)}>
+            <option>Personal</option><option>Business</option>
+          </Select>
+        </Field>
         <Field label="Notes / perks"><Input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="$50 travel credit, lounge access, etc." /></Field>
         <ModalActions onCancel={() => setOpen(false)} onSave={save} />
       </Modal>

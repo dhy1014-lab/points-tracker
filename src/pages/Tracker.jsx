@@ -7,11 +7,12 @@ import Dashboard from '../components/Dashboard'
 import Cards from '../components/Cards'
 import Ecosystems from '../components/Ecosystems'
 import Opportunities from '../components/Opportunities'
+import Credits from '../components/Credits'
 import Partners from '../components/Partners'
 
 const ALLOWED_EMAILS = ['dhy1014@gmail.com', 'sunjinro@gmail.com']
-const TABS = ['Dashboard', 'Cards', 'Points', 'Opportunities', 'Transfer partners']
-const emptyData = () => ({ cards: [], ecosystems: [], opportunities: [], partners: [] })
+const TABS = ['Dashboard', 'Cards', 'Points', 'Credits', 'Opportunities', 'Transfer partners']
+const emptyData = () => ({ cards: [], ecosystems: [], opportunities: [], partners: [], credits: [] })
 
 export default function Tracker({ user }) {
   const [tab, setTab] = useState('Dashboard')
@@ -31,7 +32,7 @@ export default function Tracker({ user }) {
 
   // Subscribe to my data
   useEffect(() => {
-    const cols = ['cards', 'ecosystems', 'opportunities', 'partners']
+    const cols = ['cards', 'ecosystems', 'opportunities', 'partners', 'credits']
     const unsubs = cols.map(col =>
       subscribe(user.uid, col, (docs) =>
         setMyData(prev => ({ ...prev, [col]: docs }))
@@ -43,7 +44,7 @@ export default function Tracker({ user }) {
   // Subscribe to partner data once resolved
   useEffect(() => {
     if (!partner?.uid) return
-    const cols = ['cards', 'ecosystems', 'opportunities', 'partners']
+    const cols = ['cards', 'ecosystems', 'opportunities', 'partners', 'credits']
     const unsubs = cols.map(col =>
       subscribe(partner.uid, col, (docs) =>
         setPartnerData(prev => ({ ...prev, [col]: docs }))
@@ -140,6 +141,7 @@ export default function Tracker({ user }) {
           {tab === 'Cards' && <Cards uid={activeUid} cards={viewData('cards')} {...sharedProps} />}
           {tab === 'Points' && <Ecosystems uid={activeUid} ecosystems={viewData('ecosystems')} {...sharedProps} />}
           {tab === 'Opportunities' && <Opportunities uid={activeUid} opportunities={viewData('opportunities')} {...sharedProps} />}
+          {tab === 'Credits' && <Credits uid={activeUid} credits={viewData('credits')} {...sharedProps} />}
           {tab === 'Transfer partners' && <Partners uid={activeUid} partners={viewData('partners')} {...sharedProps} />}
         </main>
       </div>

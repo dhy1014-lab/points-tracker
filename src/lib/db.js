@@ -1,7 +1,7 @@
 // src/lib/db.js
 import {
   collection, doc, addDoc, updateDoc, deleteDoc, setDoc, getDoc,
-  onSnapshot, query, orderBy, serverTimestamp, where, getDocs
+  onSnapshot, query, orderBy, serverTimestamp, where, getDocs, writeBatch
 } from 'firebase/firestore'
 import { db } from './firebase'
 
@@ -9,7 +9,7 @@ export const colRef = (uid, col) =>
   collection(db, 'users', uid, col)
 
 export const add = (uid, col, data) =>
-  addDoc(colRef(uid, col), { ...data, createdAt: serverTimestamp() })
+  addDoc(colRef(uid, col), { ...data, sortOrder: data.sortOrder ?? Date.now(), createdAt: serverTimestamp() })
 
 export const update = (uid, col, id, data) =>
   updateDoc(doc(db, 'users', uid, col, id), data)
@@ -19,9 +19,20 @@ export const remove = (uid, col, id) =>
 
 export const subscribe = (uid, col, callback) => {
   const q = query(colRef(uid, col), orderBy('createdAt', 'asc'))
-  return onSnapshot(q, (snap) =>
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-  )
+  return onSnapshot(q, (snap) => {
+    const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    docs.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+    callback(docs)
+  })
+}
+
+// Batch-update sortOrder for a list of {id, sortOrder} pairs
+export const reorder = async (uid, col, items) => {
+  const batch = writeBatch(db)
+  items.forEach(({ id, sortOrder }) => {
+    batch.update(doc(db, 'users', uid, col, id), { sortOrder })
+  })
+  await batch.commit()
 }
 
 export const saveProfile = (uid, displayName, email, photoURL) =>

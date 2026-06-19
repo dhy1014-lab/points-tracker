@@ -2,6 +2,17 @@
 
 Track airline, hotel, and credit card rewards. Shared with your household via Firebase.
 
+## Features
+
+- **Dashboard** — points totals, estimated value, annual fees, unused credits, upcoming renewals, open opportunities
+- **Cards** — track cards with annual fee, renewal date, status, Personal/Business grouping
+- **Points** — track balances per program with valuation and expiration policy (with tooltip)
+- **Credits** — track card credits (travel, hotel, dining, shopping, etc.) with cadence, reset date, and used/unused status
+- **Opportunities** — track new card bonuses and sign-up offers with deadlines
+- **Transfer partners** — full reference list (auto-populated) covering Chase UR, Amex MR, Citi TY, Capital One, and Bilt, collapsible by ecosystem
+- **Drag-and-drop reordering** everywhere — cards, points, credits, and transfer partners (including reordering entire ecosystem groups)
+- **Shared with your partner** — toggle between "All" (both of you, grouped by holder), or either person individually. Each person can only edit their own data.
+
 ## Setup
 
 ### 1. Firebase
@@ -14,7 +25,7 @@ Track airline, hotel, and credit card rewards. Shared with your household via Fi
 
 ### 2. Firestore security rules
 
-In Firebase Console → Firestore → Rules, paste the contents of `firestore.rules`.
+In Firebase Console → Firestore → Rules, paste the contents of `firestore.rules`. This restricts access to the two emails hardcoded in `src/App.jsx` and `src/pages/Tracker.jsx` (`ALLOWED_EMAILS`) — update those if your emails differ.
 
 ### 3. Local setup
 
@@ -38,12 +49,9 @@ Firebase Console → Authentication → Settings → Authorized domains → add 
 
 ---
 
-## Sharing with your partner
+## How sharing works
 
-1. Both of you sign in with Google
-2. Go to the sidebar → "Share with partner"
-3. Copy your **User ID** and send it to your partner (or vice versa)
-4. Paste their User ID and click Connect
-5. Toggle between "Mine" and their name at the top to switch views
+Both of you sign in with Google (emails must match the allowlist in `App.jsx` / `Tracker.jsx`). Each person's data lives under their own Firestore path, but the app automatically looks up your partner's profile by email — no codes or manual linking needed.
 
-Their data is read-only to you (and yours to them).
+Use the **All / [Your name] / [Partner name]** toggle at the top to switch between combined and individual views. In "All" view, each tab shows two sections (yours, theirs) — you can see your partner's data but can't edit it, and vice versa.
+

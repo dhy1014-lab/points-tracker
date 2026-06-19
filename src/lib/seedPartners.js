@@ -113,7 +113,18 @@ const PARTNERS = [
 ]
 
 export async function seedTransferPartners(uid) {
-  for (const p of PARTNERS) {
-    await add(uid, 'partners', p)
+  // Assign sortOrder so ecosystem groups and items stay in seeded order
+  const bySource = {}
+  PARTNERS.forEach(p => {
+    if (!bySource[p.source]) bySource[p.source] = []
+    bySource[p.source].push(p)
+  })
+  let groupIndex = 0
+  for (const source of Object.keys(bySource)) {
+    const items = bySource[source]
+    for (let i = 0; i < items.length; i++) {
+      await add(uid, 'partners', { ...items[i], sortOrder: groupIndex * 1000 + i })
+    }
+    groupIndex++
   }
 }
