@@ -80,4 +80,40 @@ const PARTNERS = [
   { source: 'Capital One', partner: 'EVA Air Infinity MileageLands', ratio: '2:1.5', category: 'Airline', notes: 'Penalty ratio; Star Alliance; business to Asia' },
   { source: 'Capital One', partner: 'Japan Airlines Mileage Bank', ratio: '2:1.5', category: 'Airline', notes: 'Penalty ratio; OneWorld; business to Japan sweet spots via partners' },
   { source: 'Capital One', partner: 'JetBlue TrueBlue', ratio: '5:3', category: 'Airline', notes: 'Penalty ratio; avoid — use Chase (1:1) if possible' },
-  { source: 'Capital One', partner: 'Wyndham Rewards', ratio: '1:1', category: 'Hotel', notes:
+  { source: 'Capital One', partner: 'Wyndham Rewards', ratio: '1:1', category: 'Hotel', notes: 'Fixed award pricing; good for expensive markets' },
+  { source: 'Capital One', partner: 'Choice Privileges', ratio: '1:1', category: 'Hotel', notes: 'Japan/Scandinavia sweet spots' },
+  { source: 'Capital One', partner: 'I Prefer (Preferred Hotels)', ratio: '1:2', category: 'Hotel', notes: 'Bonus ratio; independent luxury properties; periodic transfer bonuses' },
+  { source: 'Capital One', partner: 'Accor Live Limitless', ratio: '2:1', category: 'Hotel', notes: 'Penalty ratio; Europe/Asia properties; rarely worth it' },
+
+  // ── Bilt Rewards ──
+  { source: 'Bilt', partner: 'World of Hyatt', ratio: '1:1', category: 'Hotel', notes: 'Best use of Bilt points. Only non-Chase currency that transfers to Hyatt. Cat 1-8 from 3,500/night' },
+  { source: 'Bilt', partner: 'Alaska Airlines Atmos Rewards', ratio: '1:1', category: 'Airline', notes: 'Bilt exclusive. OneWorld; American flights from 7.5K; Cathay/JAL premium awards' },
+  { source: 'Bilt', partner: 'United MileagePlus', ratio: '1:1', category: 'Airline', notes: 'Star Alliance; domestic from 8K; international business sweet spots' },
+  { source: 'Bilt', partner: 'Air Canada Aeroplan', ratio: '1:1', category: 'Airline', notes: 'Star Alliance; Lufthansa first class; stopover awards' },
+  { source: 'Bilt', partner: 'Air France/KLM Flying Blue', ratio: '1:1', category: 'Airline', notes: 'Monthly Promo Awards; business to Europe' },
+  { source: 'Bilt', partner: 'Virgin Atlantic Flying Club', ratio: '1:1', category: 'Airline', notes: 'ANA J from 60K; Delta One sweet spots; Rent Day bonuses' },
+  { source: 'Bilt', partner: 'Emirates Skywards', ratio: '1:1', category: 'Airline', notes: 'Bilt & Chase are only major programs at 1:1; high fuel surcharges on Emirates metal' },
+  { source: 'Bilt', partner: 'British Airways Avios', ratio: '1:1', category: 'Airline', notes: 'Short-haul Europe from 4K; books AA/Iberia/Finnair/JAL' },
+  { source: 'Bilt', partner: 'Cathay Pacific Asia Miles', ratio: '1:1', category: 'Airline', notes: 'OneWorld; business to Asia; no fuel surcharges' },
+  { source: 'Bilt', partner: 'Turkish Airlines Miles&Smiles', ratio: '1:1', category: 'Airline', notes: 'Star Alliance; short-haul from 7.5K; best for United/Star Alliance awards' },
+  { source: 'Bilt', partner: 'Iberia Plus', ratio: '1:1', category: 'Airline', notes: 'OneWorld; business to Spain/Latin America from 34K each way' },
+  { source: 'Bilt', partner: 'Aer Lingus AerClub', ratio: '1:1', category: 'Airline', notes: 'OneWorld; transatlantic business to Ireland/UK' },
+  { source: 'Bilt', partner: 'Southwest Rapid Rewards', ratio: '1:1', category: 'Airline', notes: 'Domestic; Companion Pass value; no change fees' },
+  { source: 'Bilt', partner: 'Japan Airlines Mileage Bank', ratio: '1:1', category: 'Airline', notes: 'OneWorld; business to Japan; AA partner award sweet spots' },
+  { source: 'Bilt', partner: 'Qatar Airways Privilege Club', ratio: '1:1', category: 'Airline', notes: 'OneWorld; Qsuites business class' },
+  { source: 'Bilt', partner: 'Etihad Guest', ratio: '1:1', category: 'Airline', notes: 'Middle East/Asia routes' },
+  { source: 'Bilt', partner: 'TAP Miles&Go', ratio: '1:1', category: 'Airline', notes: 'Star Alliance; Portugal/Europe connections' },
+  { source: 'Bilt', partner: 'Virgin Red', ratio: '1:1', category: 'Airline', notes: 'Can convert to Virgin Atlantic Flying Club; lifestyle rewards' },
+  { source: 'Bilt', partner: 'Spirit Free Spirit', ratio: '1:1', category: 'Airline', notes: 'Budget domestic; unique Bilt exclusive; useful for cheap domestic routes' },
+  { source: 'Bilt', partner: 'Hilton Honors', ratio: '1:1', category: 'Hotel', notes: 'Points worth ~0.5¢; Hyatt almost always better' },
+  { source: 'Bilt', partner: 'Marriott Bonvoy', ratio: '1:1', category: 'Hotel', notes: 'Slow transfers; avoid unless specific redemption in mind' },
+  { source: 'Bilt', partner: 'IHG One Rewards', ratio: '1:1', category: 'Hotel', notes: 'Low point value ~0.5¢; better to pay cash most of the time' },
+  { source: 'Bilt', partner: 'Wyndham Rewards', ratio: '1:1', category: 'Hotel', notes: 'Added March 2026; 7.5K/15K/30K per night' },
+  { source: 'Bilt', partner: 'Accor Live Limitless', ratio: '3:2', category: 'Hotel', notes: 'Penalty ratio; Europe/Asia luxury properties; check value vs cash' },
+]
+
+export async function seedTransferPartners(uid) {
+  for (const p of PARTNERS) {
+    await add(uid, 'partners', p)
+  }
+}
