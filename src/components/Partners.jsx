@@ -1,7 +1,7 @@
 // src/components/Partners.jsx
 import { useState, useEffect } from 'react'
 import { add, update, remove, reorder } from '../lib/db'
-import { seedTransferPartners } from '../lib/seedPartners'
+import { seedTransferPartners, refreshTransferPartners, PARTNERS_DATA_DATE } from '../lib/seedPartners'
 import Modal from './Modal'
 import { Field, Input, Select, Row, ModalActions, Badge, IconBtn } from './FormField'
 import { SortableContainer, SortableItem, DragHandle } from './SortableList'
@@ -119,12 +119,26 @@ export default function Partners({ uid, partners, readonly, showSections, myName
   const [form, setForm] = useState(blank())
   const [editId, setEditId] = useState(null)
   const [collapsed, setCollapsed] = useState(new Set())
+  const [refreshing, setRefreshing] = useState(false)
+  const [refreshResult, setRefreshResult] = useState(null)
 
   useEffect(() => {
     if (!readonly && uid && partners.length === 0) {
       seedTransferPartners(uid)
     }
   }, [uid, readonly]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    setRefreshResult(null)
+    try {
+      const result = await refreshTransferPartners(uid)
+      setRefreshResult(result)
+      setTimeout(() => setRefreshResult(null), 6000)
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   const toggleCollapse = (source) => {
     setCollapsed(prev => {
@@ -180,13 +194,41 @@ export default function Partners({ uid, partners, readonly, showSections, myName
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-        <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Transfer partner reference</span>
+        <div>
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>Transfer partner reference</span>
+          {!readonly && (
+            <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 8 }}>
+              · data as of {PARTNERS_DATA_DATE}
+            </span>
+          )}
+        </div>
         {!readonly && (
-          <button onClick={openAdd} style={{ padding: '6px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', background: 'none', fontSize: 13 }}>
-            + Add partner
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handleRefresh} disabled={refreshing} style={{
+              padding: '6px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)',
+              background: 'none', fontSize: 13, color: 'var(--text-2)',
+              display: 'flex', alignItems: 'center', gap: 6
+            }}>
+              <span style={{ display: 'inline-block', animation: refreshing ? 'spin 1s linear infinite' : 'none' }}>↻</span>
+              {refreshing ? 'Refreshing…' : 'Refresh partner data'}
+            </button>
+            <button onClick={openAdd} style={{ padding: '6px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', background: 'none', fontSize: 13 }}>
+              + Add partner
+            </button>
+          </div>
         )}
       </div>
+
+      {refreshResult && (
+        <div style={{
+          padding: '8px 14px', borderRadius: 8, marginBottom: 12, fontSize: 13,
+          background: 'var(--green-light)', color: 'var(--green-text)'
+        }}>
+          ✓ Refreshed — {refreshResult.updated} updated, {refreshResult.added} new, {refreshResult.unchanged} already current
+        </div>
+      )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {partners.length === 0 && (
         <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-3)', fontSize: 13 }}>No transfer partners added</div>

@@ -1,6 +1,9 @@
 // src/lib/seedPartners.js
 // Run once per user to seed transfer partner reference data
-import { add } from './db'
+import { add, getAll, update } from './db'
+
+// Bump this date whenever PARTNERS data below is refreshed with new info
+export const PARTNERS_DATA_DATE = '2026-06-19'
 
 const PARTNERS = [
   // ── Chase Ultimate Rewards ──
@@ -127,4 +130,50 @@ export async function seedTransferPartners(uid) {
     }
     groupIndex++
   }
+}
+
+// Refreshes existing transfer partner entries with current ratio/category/notes
+// from the PARTNERS list above, matching by source+partner name (case-insensitive).
+// - Existing entries: ratio/category/notes are updated, sortOrder/position untouched.
+// - New entries (added to PARTNERS since last refresh): appended at the end of their group.
+// - Entries the user added manually that aren't in PARTNERS: left completely alone.
+// Returns a summary: { updated, added, unchanged }
+export async function refreshTransferPartners(uid) {
+  const existing = await getAll(uid, 'partners')
+
+  const keyOf = (s, p) => `${s.trim().toLowerCase()}|||${p.trim().toLowerCase()}`
+  const existingByKey = new Map(existing.map(e => [keyOf(e.source, e.partner), e]))
+
+  let updated = 0
+  let added = 0
+  let unchanged = 0
+
+  // Find max sortOrder per source group so new items append at the end
+  const maxSortBySource = {}
+  existing.forEach(e => {
+    const cur = maxSortBySource[e.source]
+    if (cur === undefined || (e.sortOrder ?? 0) > cur) maxSortBySource[e.source] = e.sortOrder ?? 0
+  })
+
+  for (const p of PARTNERS) {
+    const key = keyOf(p.source, p.partner)
+    const match = existingByKey.get(key)
+
+    if (match) {
+      const changed = match.ratio !== p.ratio || match.category !== p.category || match.notes !== p.notes
+      if (changed) {
+        await update(uid, 'partners', match.id, { ratio: p.ratio, category: p.category, notes: p.notes })
+        updated++
+      } else {
+        unchanged++
+      }
+    } else {
+      const nextSort = (maxSortBySource[p.source] ?? -1) + 1
+      maxSortBySource[p.source] = nextSort
+      await add(uid, 'partners', { ...p, sortOrder: nextSort })
+      added++
+    }
+  }
+
+  return { updated, added, unchanged }
 }

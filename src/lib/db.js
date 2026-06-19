@@ -35,6 +35,11 @@ export const reorder = async (uid, col, items) => {
   await batch.commit()
 }
 
+export const getAll = async (uid, col) => {
+  const snap = await getDocs(colRef(uid, col))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
 export const saveProfile = (uid, displayName, email, photoURL) =>
   setDoc(doc(db, 'users', uid), { displayName, email, photoURL }, { merge: true })
 
