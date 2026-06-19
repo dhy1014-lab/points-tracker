@@ -1,16 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read any profile (for partner lookup)
+    // Users can read any profile (for partner lookup by email)
     // but only write their own
     match /users/{uid} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null &&
+        request.auth.token.email in ['dhy1014@gmail.com', 'sunjinro@gmail.com'];
+      allow write: if request.auth != null &&
+        request.auth.uid == uid &&
+        request.auth.token.email in ['dhy1014@gmail.com', 'sunjinro@gmail.com'];
 
-      // Each user owns their own subcollections
       match /{collection}/{docId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null && request.auth.uid == uid;
+        allow read: if request.auth != null &&
+          request.auth.token.email in ['dhy1014@gmail.com', 'sunjinro@gmail.com'];
+        allow write: if request.auth != null &&
+          request.auth.uid == uid &&
+          request.auth.token.email in ['dhy1014@gmail.com', 'sunjinro@gmail.com'];
       }
     }
   }

@@ -1,16 +1,24 @@
 // src/App.jsx
 import { useState, useEffect } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { auth } from './lib/firebase'
 import { saveProfile } from './lib/db'
 import Login from './pages/Login'
 import Tracker from './pages/Tracker'
 
+const ALLOWED = ['dhy1014@gmail.com', 'sunjinro@gmail.com']
+
 export default function App() {
-  const [user, setUser] = useState(undefined) // undefined = loading
+  const [user, setUser] = useState(undefined)
 
   useEffect(() => {
     return onAuthStateChanged(auth, (u) => {
+      if (u && !ALLOWED.includes(u.email.toLowerCase())) {
+        signOut(auth)
+        setUser(null)
+        alert('This app is private.')
+        return
+      }
       setUser(u)
       if (u) saveProfile(u.uid, u.displayName, u.email, u.photoURL)
     })

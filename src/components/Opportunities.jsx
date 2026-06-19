@@ -9,39 +9,16 @@ const STATUS_COLOR = {
   'Active — meeting spend': 'amber',
   'Bonus earned': 'green', Passed: 'gray'
 }
-
 const blank = () => ({ name: '', bonus: '', spend: '', deadline: '', status: 'Considering', ecosystem: '' })
 
-export default function Opportunities({ uid, opportunities, readonly }) {
-  const [open, setOpen] = useState(false)
-  const [form, setForm] = useState(blank())
-  const [editId, setEditId] = useState(null)
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  const openAdd = () => { setForm(blank()); setEditId(null); setOpen(true) }
-  const openEdit = (o) => {
-    setForm({ name: o.name, bonus: o.bonus, spend: o.spend, deadline: o.deadline, status: o.status, ecosystem: o.ecosystem })
-    setEditId(o.id); setOpen(true)
-  }
-
-  const save = async () => {
-    if (!form.name.trim()) return
-    if (editId) await update(uid, 'opportunities', editId, form)
-    else await add(uid, 'opportunities', form)
-    setOpen(false)
-  }
-
+function OppTable({ rows, uid, readonly, onEdit }) {
   const daysUntil = (d) => d ? Math.round((new Date(d) - new Date()) / 86400000) : null
-
-  const active = opportunities.filter(o => !['Bonus earned', 'Passed'].includes(o.status))
-  const done = opportunities.filter(o => ['Bonus earned', 'Passed'].includes(o.status))
-
-  const renderTable = (rows) => (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+  if (rows.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '0.5rem 0' }}>None</div>
+  return (
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 8 }}>
       <thead>
         <tr style={{ borderBottom: '1px solid var(--border)' }}>
-          {['Offer', 'Ecosystem', 'Bonus', 'Spend req.', 'Deadline', 'Status', ''].map(h => (
+          {['Offer', 'Ecosystem', 'Bonus', 'Spend', 'Deadline', 'Status', ''].map(h => (
             <th key={h} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 11, fontWeight: 600, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{h}</th>
           ))}
         </tr>
@@ -55,22 +32,16 @@ export default function Opportunities({ uid, opportunities, readonly }) {
             <tr key={o.id} style={{ borderBottom: '1px solid var(--border)' }}>
               <td style={{ padding: '10px 10px', fontWeight: 500 }}>{o.name}</td>
               <td style={{ padding: '10px 10px', color: 'var(--text-2)' }}>{o.ecosystem || '—'}</td>
-              <td style={{ padding: '10px 10px', fontFamily: 'var(--mono)' }}>
-                {o.bonus ? parseInt(o.bonus).toLocaleString() : '—'}
-              </td>
-              <td style={{ padding: '10px 10px', fontFamily: 'var(--mono)' }}>
-                {o.spend ? '$' + parseInt(o.spend).toLocaleString() : '—'}
-              </td>
+              <td style={{ padding: '10px 10px', fontFamily: 'var(--mono)' }}>{o.bonus ? parseInt(o.bonus).toLocaleString() : '—'}</td>
+              <td style={{ padding: '10px 10px', fontFamily: 'var(--mono)' }}>{o.spend ? '$' + parseInt(o.spend).toLocaleString() : '—'}</td>
               <td style={{ padding: '10px 10px' }}>
                 {deadColor ? <Badge color={deadColor}>{deadLabel}</Badge> : <span style={{ color: 'var(--text-2)' }}>{deadLabel}</span>}
               </td>
+              <td style={{ padding: '10px 10px' }}><Badge color={STATUS_COLOR[o.status] || 'blue'}>{o.status}</Badge></td>
               <td style={{ padding: '10px 10px' }}>
-                <Badge color={STATUS_COLOR[o.status] || 'blue'}>{o.status}</Badge>
-              </td>
-              <td style={{ padding: '10px 10px' }}>
-                {!readonly && (
+                {!readonly && o._uid === uid && (
                   <div style={{ display: 'flex', gap: 4 }}>
-                    <IconBtn onClick={() => openEdit(o)} title="Edit">✏️</IconBtn>
+                    <IconBtn onClick={() => onEdit(o)} title="Edit">✏️</IconBtn>
                     <IconBtn onClick={() => remove(uid, 'opportunities', o.id)} title="Delete">🗑</IconBtn>
                   </div>
                 )}
@@ -81,38 +52,67 @@ export default function Opportunities({ uid, opportunities, readonly }) {
       </tbody>
     </table>
   )
+}
+
+export default function Opportunities({ uid, opportunities, readonly, showSections, myName, partnerName }) {
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState(blank())
+  const [editId, setEditId] = useState(null)
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const openAdd = () => { setForm(blank()); setEditId(null); setOpen(true) }
+  const openEdit = (o) => { setForm({ name: o.name, bonus: o.bonus, spend: o.spend, deadline: o.deadline, status: o.status, ecosystem: o.ecosystem }); setEditId(o.id); setOpen(true) }
+
+  const save = async () => {
+    if (!form.name.trim()) return
+    if (editId) await update(uid, 'opportunities', editId, form)
+    else await add(uid, 'opportunities', form)
+    setOpen(false)
+  }
+
+  const SectionHeader = ({ name, count }) => (
+    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8, marginTop: 16 }}>
+      {name} · {count}
+    </div>
+  )
+
+  const mine = opportunities.filter(o => o._holder === myName)
+  const theirs = opportunities.filter(o => o._holder === partnerName)
+
+  const renderSplit = (items) => {
+    const active = items.filter(o => !['Bonus earned', 'Passed'].includes(o.status))
+    const done = items.filter(o => ['Bonus earned', 'Passed'].includes(o.status))
+    return (
+      <>
+        {active.length > 0 && <OppTable rows={active} uid={uid} readonly={readonly} onEdit={openEdit} />}
+        {done.length > 0 && <div style={{ opacity: 0.6 }}><OppTable rows={done} uid={uid} readonly={readonly} onEdit={openEdit} /></div>}
+      </>
+    )
+  }
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
         <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{opportunities.length} tracked</span>
         {!readonly && (
-          <button onClick={openAdd} style={{
-            padding: '6px 12px', border: '1px solid var(--border-strong)',
-            borderRadius: 'var(--radius)', background: 'none', fontSize: 13
-          }}>+ Add opportunity</button>
+          <button onClick={openAdd} style={{ padding: '6px 12px', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius)', background: 'none', fontSize: 13 }}>
+            + Add opportunity
+          </button>
         )}
       </div>
 
       {opportunities.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-3)', fontSize: 13 }}>
-          {readonly ? 'No opportunities tracked' : 'Track new card bonuses and limited-time offers'}
-        </div>
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-3)', fontSize: 13 }}>No opportunities tracked</div>
       )}
 
-      {active.length > 0 && (
-        <div style={{ marginBottom: '1.5rem', overflowX: 'auto' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active</div>
-          {renderTable(active)}
-        </div>
-      )}
-
-      {done.length > 0 && (
-        <div style={{ overflowX: 'auto', opacity: 0.7 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Done</div>
-          {renderTable(done)}
-        </div>
-      )}
+      <div style={{ overflowX: 'auto' }}>
+        {showSections ? (
+          <>
+            {mine.length > 0 && <><SectionHeader name={myName} count={mine.length} />{renderSplit(mine)}</>}
+            {theirs.length > 0 && <><SectionHeader name={partnerName} count={theirs.length} />{renderSplit(theirs)}</>}
+          </>
+        ) : renderSplit(opportunities)}
+      </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Edit opportunity' : 'Add opportunity'}>
         <Field label="Offer name"><Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Amex Gold welcome bonus" /></Field>
@@ -126,11 +126,7 @@ export default function Opportunities({ uid, opportunities, readonly }) {
         </Row>
         <Field label="Status">
           <Select value={form.status} onChange={e => set('status', e.target.value)}>
-            <option>Considering</option>
-            <option>Applied</option>
-            <option>Active — meeting spend</option>
-            <option>Bonus earned</option>
-            <option>Passed</option>
+            <option>Considering</option><option>Applied</option><option>Active — meeting spend</option><option>Bonus earned</option><option>Passed</option>
           </Select>
         </Field>
         <ModalActions onCancel={() => setOpen(false)} onSave={save} />

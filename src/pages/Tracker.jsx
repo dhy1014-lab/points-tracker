@@ -2,27 +2,34 @@
 import { useState, useEffect } from 'react'
 import { signOut } from 'firebase/auth'
 import { auth } from '../lib/firebase'
-import { subscribe, getProfile } from '../lib/db'
+import { subscribe, getPartnerByEmail } from '../lib/db'
 import Dashboard from '../components/Dashboard'
 import Cards from '../components/Cards'
 import Ecosystems from '../components/Ecosystems'
 import Opportunities from '../components/Opportunities'
 import Partners from '../components/Partners'
 
+const ALLOWED_EMAILS = ['dhy1014@gmail.com', 'sunjinro@gmail.com']
 const TABS = ['Dashboard', 'Cards', 'Points', 'Opportunities', 'Transfer partners']
+const emptyData = () => ({ cards: [], ecosystems: [], opportunities: [], partners: [] })
 
 export default function Tracker({ user }) {
   const [tab, setTab] = useState('Dashboard')
-  const [myData, setMyData] = useState({ cards: [], ecosystems: [], opportunities: [], partners: [] })
-  const [partnerData, setPartnerData] = useState(null)
-  const [partnerUid, setPartnerUid] = useState('')
-  const [partnerInputVal, setPartnerInputVal] = useState('')
-  const [partnerProfile, setPartnerProfile] = useState(null)
-  const [viewingPartner, setViewingPartner] = useState(false)
-  const [partnerLoading, setPartnerLoading] = useState(false)
-  const [partnerError, setPartnerError] = useState('')
+  const [view, setView] = useState('all') // 'all' | 'me' | 'partner'
+  const [myData, setMyData] = useState(emptyData())
+  const [partnerData, setPartnerData] = useState(emptyData())
+  const [partner, setPartner] = useState(null) // { uid, displayName, ... }
 
-  // Subscribe to my own data
+  const myName = user.displayName?.split(' ')[0] || 'Me'
+  const partnerEmail = ALLOWED_EMAILS.find(e => e !== user.email.toLowerCase())
+
+  // Resolve partner profile from their email
+  useEffect(() => {
+    if (!partnerEmail) return
+    getPartnerByEmail(partnerEmail).then(p => { if (p) setPartner(p) })
+  }, [partnerEmail])
+
+  // Subscribe to my data
   useEffect(() => {
     const cols = ['cards', 'ecosystems', 'opportunities', 'partners']
     const unsubs = cols.map(col =>
@@ -33,91 +40,74 @@ export default function Tracker({ user }) {
     return () => unsubs.forEach(u => u())
   }, [user.uid])
 
-  // Subscribe to partner data if connected
+  // Subscribe to partner data once resolved
   useEffect(() => {
-    if (!partnerUid) { setPartnerData(null); return }
+    if (!partner?.uid) return
     const cols = ['cards', 'ecosystems', 'opportunities', 'partners']
-    const d = { cards: [], ecosystems: [], opportunities: [], partners: [] }
     const unsubs = cols.map(col =>
-      subscribe(partnerUid, col, (docs) => {
-        d[col] = docs
-        setPartnerData({ ...d })
-      })
+      subscribe(partner.uid, col, (docs) =>
+        setPartnerData(prev => ({ ...prev, [col]: docs }))
+      )
     )
     return () => unsubs.forEach(u => u())
-  }, [partnerUid])
+  }, [partner?.uid])
 
-  const connectPartner = async () => {
-    const uid = partnerInputVal.trim()
-    if (!uid) return
-    setPartnerLoading(true)
-    setPartnerError('')
-    const profile = await getProfile(uid)
-    if (!profile) {
-      setPartnerError('No account found with that user ID')
-      setPartnerLoading(false)
-      return
-    }
-    setPartnerUid(uid)
-    setPartnerProfile(profile)
-    setPartnerLoading(false)
+  const partnerName = partner?.displayName?.split(' ')[0] || 'Partner'
+
+  const tag = (items, name, uid) => items.map(item => ({ ...item, _holder: name, _uid: uid }))
+
+  const viewData = (col) => {
+    if (view === 'me') return tag(myData[col], myName, user.uid)
+    if (view === 'partner') return tag(partnerData[col], partnerName, partner?.uid)
+    return [...tag(myData[col], myName, user.uid), ...tag(partnerData[col], partnerName, partner?.uid)]
   }
 
-  const currentData = viewingPartner && partnerData ? partnerData : myData
-  const currentUid = viewingPartner && partnerUid ? partnerUid : user.uid
-  const isReadonly = viewingPartner
+  const activeUid = view === 'partner' ? partner?.uid : user.uid
+  const isReadonly = view === 'partner'
+  const showSections = view === 'all'
+
+  const sharedProps = { readonly: isReadonly, showSections, myName, partnerName }
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top nav */}
       <header style={{
         background: 'var(--surface)', borderBottom: '1px solid var(--border)',
         padding: '0 1.5rem', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', height: 52, position: 'sticky', top: 0, zIndex: 10
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 18 }}>✈</span>
-          <span style={{ fontWeight: 600, fontSize: 15 }}>Points Tracker</span>
-          {partnerProfile && (
-            <div style={{ display: 'flex', gap: 4, marginLeft: 12 }}>
-              <button
-                onClick={() => setViewingPartner(false)}
-                style={{
-                  padding: '3px 10px', fontSize: 12, borderRadius: 20,
-                  border: '1px solid var(--border-strong)',
-                  background: !viewingPartner ? 'var(--text)' : 'none',
-                  color: !viewingPartner ? '#fff' : 'var(--text)',
-                  cursor: 'pointer'
-                }}
-              >Mine</button>
-              <button
-                onClick={() => setViewingPartner(true)}
-                style={{
-                  padding: '3px 10px', fontSize: 12, borderRadius: 20,
-                  border: '1px solid var(--border-strong)',
-                  background: viewingPartner ? 'var(--text)' : 'none',
-                  color: viewingPartner ? '#fff' : 'var(--text)',
-                  cursor: 'pointer'
-                }}
-              >{partnerProfile.displayName?.split(' ')[0] || 'Partner'}</button>
-            </div>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 18 }}>✈</span>
+            <span style={{ fontWeight: 600, fontSize: 15 }}>Points Tracker</span>
+          </div>
+          <div style={{
+            display: 'flex', background: 'var(--bg)', borderRadius: 20,
+            padding: 3, gap: 2, border: '1px solid var(--border)'
+          }}>
+            {[['all', 'All'], ['me', myName], ['partner', partnerName]].map(([v, label]) => (
+              <button key={v} onClick={() => setView(v)} style={{
+                padding: '3px 12px', fontSize: 12, borderRadius: 20, border: 'none',
+                cursor: 'pointer',
+                background: view === v ? 'var(--surface)' : 'transparent',
+                color: view === v ? 'var(--text)' : 'var(--text-2)',
+                fontWeight: view === v ? 500 : 400,
+                boxShadow: view === v ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.15s'
+              }}>{label}</button>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {user.photoURL && (
-            <img src={user.photoURL} alt="" style={{ width: 28, height: 28, borderRadius: '50%' }} />
-          )}
-          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{user.displayName?.split(' ')[0]}</span>
-          <button
-            onClick={() => signOut(auth)}
-            style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}
-          >Sign out</button>
+          {user.photoURL && <img src={user.photoURL} alt="" style={{ width: 28, height: 28, borderRadius: '50%' }} />}
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{myName}</span>
+          <button onClick={() => signOut(auth)} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            Sign out
+          </button>
         </div>
       </header>
 
       <div style={{ display: 'flex', flex: 1 }}>
-        {/* Sidebar */}
         <nav style={{
           width: 180, borderRight: '1px solid var(--border)',
           padding: '1rem 0', background: 'var(--surface)',
@@ -131,66 +121,26 @@ export default function Tracker({ user }) {
               border: 'none', borderLeft: tab === t ? '2px solid var(--text)' : '2px solid transparent',
               fontSize: 13, fontWeight: tab === t ? 500 : 400,
               color: tab === t ? 'var(--text)' : 'var(--text-2)',
-              cursor: 'pointer', marginRight: 0
+              cursor: 'pointer'
             }}>{t}</button>
           ))}
-
-          {/* Partner connect */}
-          <div style={{ marginTop: 'auto', padding: '1rem', borderTop: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-              {partnerProfile ? 'Household' : 'Share with partner'}
-            </div>
-            {partnerProfile ? (
-              <div style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                Connected to {partnerProfile.displayName}
-                <button onClick={() => { setPartnerUid(''); setPartnerProfile(null); setViewingPartner(false) }}
-                  style={{ display: 'block', marginTop: 4, fontSize: 11, color: 'var(--red)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <>
-                <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6 }}>
-                  Your user ID:<br />
-                  <code style={{ fontSize: 10, wordBreak: 'break-all', fontFamily: 'var(--mono)', color: 'var(--text-2)' }}>{user.uid}</code>
-                </div>
-                <input
-                  value={partnerInputVal}
-                  onChange={e => setPartnerInputVal(e.target.value)}
-                  placeholder="Partner's user ID"
-                  style={{
-                    width: '100%', padding: '5px 8px', border: '1px solid var(--border-strong)',
-                    borderRadius: 6, fontSize: 11, marginBottom: 6,
-                    background: 'var(--surface)', color: 'var(--text)'
-                  }}
-                />
-                <button onClick={connectPartner} disabled={partnerLoading} style={{
-                  width: '100%', padding: '5px 0', fontSize: 11,
-                  border: '1px solid var(--border-strong)', borderRadius: 6,
-                  background: 'none', cursor: 'pointer', color: 'var(--text)'
-                }}>{partnerLoading ? 'Connecting…' : 'Connect'}</button>
-                {partnerError && <div style={{ fontSize: 11, color: 'var(--red)', marginTop: 4 }}>{partnerError}</div>}
-              </>
-            )}
-          </div>
         </nav>
 
-        {/* Main content */}
         <main style={{ flex: 1, padding: '1.5rem 2rem', maxWidth: 900 }}>
-          {viewingPartner && (
+          {view === 'partner' && (
             <div style={{
               padding: '8px 14px', borderRadius: 8, marginBottom: '1rem',
               background: 'var(--accent-light)', color: 'var(--accent-text)', fontSize: 13
             }}>
-              Viewing {partnerProfile?.displayName}'s data — read only
+              Viewing {partnerName}'s data — read only
             </div>
           )}
 
-          {tab === 'Dashboard' && <Dashboard {...currentData} />}
-          {tab === 'Cards' && <Cards uid={currentUid} cards={currentData.cards} readonly={isReadonly} />}
-          {tab === 'Points' && <Ecosystems uid={currentUid} ecosystems={currentData.ecosystems} readonly={isReadonly} />}
-          {tab === 'Opportunities' && <Opportunities uid={currentUid} opportunities={currentData.opportunities} readonly={isReadonly} />}
-          {tab === 'Transfer partners' && <Partners uid={currentUid} partners={currentData.partners} readonly={isReadonly} />}
+          {tab === 'Dashboard' && <Dashboard cards={viewData('cards')} ecosystems={viewData('ecosystems')} opportunities={viewData('opportunities')} {...sharedProps} />}
+          {tab === 'Cards' && <Cards uid={activeUid} cards={viewData('cards')} {...sharedProps} />}
+          {tab === 'Points' && <Ecosystems uid={activeUid} ecosystems={viewData('ecosystems')} {...sharedProps} />}
+          {tab === 'Opportunities' && <Opportunities uid={activeUid} opportunities={viewData('opportunities')} {...sharedProps} />}
+          {tab === 'Transfer partners' && <Partners uid={activeUid} partners={viewData('partners')} {...sharedProps} />}
         </main>
       </div>
     </div>
