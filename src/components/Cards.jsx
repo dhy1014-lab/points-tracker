@@ -1,6 +1,7 @@
 // src/components/Cards.jsx
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { add, update, remove, reorder } from '../lib/db'
+import { searchCards, getCardByName } from '../lib/cardCredits'
 import Modal from './Modal'
 import { Field, Input, Select, Row, ModalActions, Badge, IconBtn } from './FormField'
 import { SortableContainer, SortableItem, DragHandle } from './SortableList'
@@ -16,7 +17,7 @@ function CardItem({ c, uid, readonly, onEdit, listeners, dragDisabled }) {
   return (
     <div style={{
       background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem', position: 'relative'
+      borderRadius: 'var(--radius-lg)', padding: '1rem 1.25rem'
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
@@ -49,9 +50,7 @@ function CardItem({ c, uid, readonly, onEdit, listeners, dragDisabled }) {
 
 function CardGrid({ cards, uid, readonly, onEdit, onReorder }) {
   if (cards.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '1rem 0' }}>No cards</div>
-
   const dragDisabled = readonly || cards.some(c => c._uid !== uid)
-
   return (
     <SortableContainer items={cards} onReorder={onReorder} disabled={dragDisabled}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginBottom: 8 }}>
@@ -65,20 +64,125 @@ function CardGrid({ cards, uid, readonly, onEdit, onReorder }) {
   )
 }
 
-export default function Cards({ uid, cards, readonly, showSections, myName, partnerName }) {
+// Autocomplete input for card name
+function CardNameInput({ value, onChange, onSelectCard }) {
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [highlightIdx, setHighlightIdx] = useState(-1)
+  const wrapRef = useRef(null)
+
+  useEffect(() => {
+    const results = searchCards(value)
+    setSuggestions(results)
+    setHighlightIdx(-1)
+  }, [value])
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setShowSuggestions(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const handleKeyDown = (e) => {
+    if (!showSuggestions || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setHighlightIdx(i => Math.min(i + 1, suggestions.length - 1)) }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setHighlightIdx(i => Math.max(i - 1, 0)) }
+    if (e.key === 'Enter' && highlightIdx >= 0) { e.preventDefault(); selectSuggestion(suggestions[highlightIdx]) }
+    if (e.key === 'Escape') setShowSuggestions(false)
+  }
+
+  const selectSuggestion = (card) => {
+    onChange(card.name)
+    setShowSuggestions(false)
+    onSelectCard(card)
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative' }}>
+      <Input
+        value={value}
+        onChange={e => { onChange(e.target.value); setShowSuggestions(true) }}
+        onFocus={() => setShowSuggestions(true)}
+        onKeyDown={handleKeyDown}
+        placeholder="Chase Sapphire Reserve"
+        autoComplete="off"
+      />
+      {showSuggestions && suggestions.length > 0 && (
+        <div style={{
+          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+          background: 'var(--surface)', border: '1px solid var(--border-strong)',
+          borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+          overflow: 'hidden', marginTop: 4
+        }}>
+          {suggestions.map((card, i) => (
+            <div
+              key={card.name}
+              onMouseDown={() => selectSuggestion(card)}
+              style={{
+                padding: '8px 12px', cursor: 'pointer', fontSize: 13,
+                background: i === highlightIdx ? 'var(--bg)' : 'transparent',
+                borderBottom: i < suggestions.length - 1 ? '1px solid var(--border)' : 'none'
+              }}
+              onMouseEnter={() => setHighlightIdx(i)}
+            >
+              <div style={{ fontWeight: 500 }}>{card.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 1 }}>
+                {card.issuer} · {card.credits.length} credit{card.credits.length !== 1 ? 's' : ''} known
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function Cards({ uid, cards, readonly, showSections, myName, partnerName, onAddCredits }) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(blank())
   const [editId, setEditId] = useState(null)
+  const [pendingCredits, setPendingCredits] = useState(null) // { cardName, credits[] }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-  const openAdd = () => { setForm(blank()); setEditId(null); setOpen(true) }
-  const openEdit = (c) => { setForm({ name: c.name, ecosystem: c.ecosystem, fee: c.fee, renewal: c.renewal, status: c.status, notes: c.notes, group: c.group || 'Personal' }); setEditId(c.id); setOpen(true) }
+  const openAdd = () => { setForm(blank()); setEditId(null); setPendingCredits(null); setOpen(true) }
+  const openEdit = (c) => {
+    setForm({ name: c.name, ecosystem: c.ecosystem, fee: c.fee, renewal: c.renewal, status: c.status, notes: c.notes, group: c.group || 'Personal' })
+    setEditId(c.id); setPendingCredits(null); setOpen(true)
+  }
+
+  const handleSelectCard = (card) => {
+    if (card.credits && card.credits.length > 0) {
+      setPendingCredits({ cardName: card.name, credits: card.credits })
+    } else {
+      setPendingCredits(null)
+    }
+  }
 
   const save = async () => {
     if (!form.name.trim()) return
-    if (editId) await update(uid, 'cards', editId, form)
-    else await add(uid, 'cards', form)
+    if (editId) {
+      await update(uid, 'cards', editId, form)
+    } else {
+      await add(uid, 'cards', form)
+      // If known card selected with credits, offer to add them
+      const match = getCardByName(form.name)
+      if (match && match.credits.length > 0 && onAddCredits) {
+        setPendingCredits({ cardName: form.name, credits: match.credits })
+        setOpen(false)
+        return
+      }
+    }
     setOpen(false)
+    setPendingCredits(null)
+  }
+
+  const confirmAddCredits = async () => {
+    if (pendingCredits && onAddCredits) {
+      await onAddCredits(pendingCredits.cardName, pendingCredits.credits)
+    }
+    setPendingCredits(null)
   }
 
   const handleReorder = async (newOrder) => {
@@ -88,7 +192,6 @@ export default function Cards({ uid, cards, readonly, showSections, myName, part
   const myCards = cards.filter(c => c._holder === myName)
   const partnerCards = cards.filter(c => c._holder === partnerName)
 
-  // Group by Business/Personal within each holder
   const groupBy = (list) => {
     const groups = {}
     list.forEach(c => {
@@ -141,8 +244,23 @@ export default function Cards({ uid, cards, readonly, showSections, myName, part
         <GroupBlock list={cards} holderReadonly={readonly} />
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editId ? 'Edit card' : 'Add card'}>
-        <Field label="Card name"><Input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Chase Sapphire Preferred" /></Field>
+      {/* Add / Edit card modal */}
+      <Modal open={open} onClose={() => { setOpen(false); setPendingCredits(null) }} title={editId ? 'Edit card' : 'Add card'}>
+        <Field label="Card name">
+          <CardNameInput
+            value={form.name}
+            onChange={v => set('name', v)}
+            onSelectCard={handleSelectCard}
+          />
+        </Field>
+        {pendingCredits && !editId && (
+          <div style={{
+            padding: '10px 12px', borderRadius: 8, marginBottom: 4,
+            background: 'var(--accent-light)', color: 'var(--accent-text)', fontSize: 12
+          }}>
+            ✦ {pendingCredits.credits.length} credits known for this card — they'll be added to your Credits tab after saving.
+          </div>
+        )}
         <Row>
           <Field label="Ecosystem"><Input value={form.ecosystem} onChange={e => set('ecosystem', e.target.value)} placeholder="Chase UR" /></Field>
           <Field label="Annual fee ($)"><Input type="number" value={form.fee} onChange={e => set('fee', e.target.value)} placeholder="95" /></Field>
@@ -161,7 +279,28 @@ export default function Cards({ uid, cards, readonly, showSections, myName, part
           </Select>
         </Field>
         <Field label="Notes / perks"><Input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="$50 travel credit, lounge access, etc." /></Field>
-        <ModalActions onCancel={() => setOpen(false)} onSave={save} />
+        <ModalActions onCancel={() => { setOpen(false); setPendingCredits(null) }} onSave={save} />
+      </Modal>
+
+      {/* Confirm add credits modal */}
+      <Modal open={!!pendingCredits && !open} onClose={() => setPendingCredits(null)} title={`Add credits for ${pendingCredits?.cardName}?`}>
+        <p style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>
+          We know about {pendingCredits?.credits.length} credits for this card. Add them to your Credits tab now?
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, maxHeight: 260, overflowY: 'auto' }}>
+          {pendingCredits?.credits.map((c, i) => (
+            <div key={i} style={{
+              padding: '8px 12px', borderRadius: 8,
+              background: 'var(--bg)', border: '1px solid var(--border)', fontSize: 13
+            }}>
+              <div style={{ fontWeight: 500 }}>{c.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
+                {c.amount > 0 ? `$${c.amount}` : ''} · {c.cadence} · {c.category}
+              </div>
+            </div>
+          ))}
+        </div>
+        <ModalActions onCancel={() => setPendingCredits(null)} onSave={confirmAddCredits} saveLabel="Add credits" />
       </Modal>
     </div>
   )

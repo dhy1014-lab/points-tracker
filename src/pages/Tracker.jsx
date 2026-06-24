@@ -138,7 +138,12 @@ export default function Tracker({ user }) {
           )}
 
           {tab === 'Dashboard' && <Dashboard cards={viewData('cards')} ecosystems={viewData('ecosystems')} opportunities={viewData('opportunities')} {...sharedProps} />}
-          {tab === 'Cards' && <Cards uid={activeUid} cards={viewData('cards')} {...sharedProps} />}
+          {tab === 'Cards' && <Cards uid={activeUid} cards={viewData('cards')} {...sharedProps} onAddCredits={async (cardName, credits) => {
+            const { add } = await import('../lib/db')
+            for (const c of credits) {
+              await add(activeUid, 'credits', { ...c, cardName, used: false })
+            }
+          }} />}
           {tab === 'Points' && <Ecosystems uid={activeUid} ecosystems={viewData('ecosystems')} {...sharedProps} />}
           {tab === 'Opportunities' && <Opportunities uid={activeUid} opportunities={viewData('opportunities')} {...sharedProps} />}
           {tab === 'Credits' && <Credits uid={activeUid} credits={viewData('credits')} {...sharedProps} />}
